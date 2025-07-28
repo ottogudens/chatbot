@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # NUEVO SERVICIO DE BASE DE DATOS
+  postgres-db:
+    image: postgres:16-alpine # Usamos una imagen oficial y ligera de Postgres
+    container_name: converselink-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data # Mapea el volumen persistente
+    networks:
+      - converselink-net
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: converselink-gateway
+    restart: always
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./api-gateway/.env
+    networks:
+      - converselink-net
+    depends_on: # El gateway no necesita la BD, pero es buena práctica esperar a los servicios
+      - auth-service
+      - bot-manager
+
+  auth-service:
+    build: ./auth-service
+    container_name: converselink-auth
+    restart: always
+    env_file:
+      - ./auth-service/.env
+    networks:
+      - converselink-net
+    depends_on: # Este servicio necesita que la BD esté lista antes de arrancar
+      - postgres-db
+
+  bot-manager:
+    build: ./bot-manager
+    container_name: converselink-bot-manager
+    restart: always
+    env_file:
+      - ./bot-manager/.env
+    networks:
+      - converselink-net
+    depends_on: # Este servicio también depende de la BD
+      - postgres-db
+
+networks:
+  converselink-net:
+    driver: bridge
